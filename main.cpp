@@ -661,7 +661,7 @@ int main(){
         auto S = ecc::ecdh_shared_secret(priv, sender_pub);
         auto aes_key = kdf_from_ecdh(S);
         std::cout << "1 is ok";
-        // 2️⃣ AES 복호화 (패딩 제거는 AES 내부에서 처리)
+        // 2️⃣ AES 복호화 (패딩 제거는 AES 내부에서 처리
         auto pt_bytes = aes128::decrypt(ct, aes_key);
         std::string plaintext = to_string(pt_bytes);
         std::cout << "2 is ok";
