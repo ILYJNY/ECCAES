@@ -1,4 +1,4 @@
 C:\Users\User\AppData\Local\Programs\CLion\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/Users/User/AppData/Local/Programs/CLion/bin/ninja/win/x64/ninja.exe -DBOOST_ROOT=C:/Users/User/CLionProjects/ECCAES/boost_1_90_0C:/Users/User/CLionProjects/ECCAES -G Ninja -S C:\Users\User\CLionProjects\ECCAES -B C:\Users\User\CLionProjects\ECCAES\cmake-build-debug
--- Configuring done (0.1s)
+-- Configuring done (0.2s)
 -- Generating done (0.1s)
 -- Build files have been written to: C:/Users/User/CLionProjects/ECCAES/cmake-build-debug
