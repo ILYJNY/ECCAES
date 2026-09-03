@@ -8,5 +8,7 @@ include_directories(
 )
 
 add_executable(ECCAES main.cpp
+        RSAVER.cpp
+        RSAVER.h
 
 )
