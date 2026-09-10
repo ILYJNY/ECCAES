@@ -9,6 +9,9 @@ include_directories(
 
 add_executable(ECCAES main.cpp
         RSAVER.cpp
-        RSAVER.h
+        RSAVER.hpp
+        ECCVER.cpp
+        ECCVER.hpp
+        CryptoUtils.hpp
 
 )

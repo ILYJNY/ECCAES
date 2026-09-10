@@ -135,6 +135,30 @@ ECCAES/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\ECCAES.dir\build.make CMakeFiles/ECCAES.dir/build
 .PHONY : ECCAES/fast
 
+ECCVER.obj: ECCVER.cpp.obj
+.PHONY : ECCVER.obj
+
+# target to build an object file
+ECCVER.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ECCAES.dir\build.make CMakeFiles/ECCAES.dir/ECCVER.cpp.obj
+.PHONY : ECCVER.cpp.obj
+
+ECCVER.i: ECCVER.cpp.i
+.PHONY : ECCVER.i
+
+# target to preprocess a source file
+ECCVER.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ECCAES.dir\build.make CMakeFiles/ECCAES.dir/ECCVER.cpp.i
+.PHONY : ECCVER.cpp.i
+
+ECCVER.s: ECCVER.cpp.s
+.PHONY : ECCVER.s
+
+# target to generate assembly for a file
+ECCVER.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ECCAES.dir\build.make CMakeFiles/ECCAES.dir/ECCVER.cpp.s
+.PHONY : ECCVER.cpp.s
+
 RSAVER.obj: RSAVER.cpp.obj
 .PHONY : RSAVER.obj
 
@@ -193,6 +217,9 @@ help:
 	@echo ... edit_cache
 	@echo ... rebuild_cache
 	@echo ... ECCAES
+	@echo ... ECCVER.obj
+	@echo ... ECCVER.i
+	@echo ... ECCVER.s
 	@echo ... RSAVER.obj
 	@echo ... RSAVER.i
 	@echo ... RSAVER.s
