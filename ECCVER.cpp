@@ -1,165 +1,190 @@
+#include <iostream>
 #include <random>
+#include <iomanip>
+#include <vector>
+#include <string>
+#include <chrono>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "ECCVER.hpp"
 #include "CryptoUtils.hpp"
+#include "LWEVER.hpp"
 
 using boost::multiprecision::cpp_int;
-using Byte = uint8_t;
-using Block = std::array<Byte,16>;
 
-/* ================= secp256k1 도메인 파라미터 ================= */
-const cpp_int P("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
-const cpp_int N("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141");
-const cpp_int Gx("0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
-const cpp_int Gy("0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
-struct Point{ cpp_int x,y; bool inf=false; };
+static const cpp_int P("65537");
+static const cpp_int N_ecc("65537");
+static const cpp_int Gx("2");
+static const cpp_int Gy("3");
 
-/* ================= MOD & 난수 ================= */
+struct Point { cpp_int x, y; bool inf = false; };
 
-cpp_int generateRandom256(const cpp_int& max_val) {
+static cpp_int generateRandom16(const cpp_int& max_val) {
     std::random_device rd;
-    std::mt19937_64 eng(rd());
-    std::uniform_int_distribution<uint64_t> dist(0, 0xFFFFFFFFFFFFFFFFULL);
-
-    cpp_int random_val = 0;
-    for (int i = 0; i < 4; ++i) {
-        random_val = (random_val << 64) | dist(eng);
-    }
-    return mod(random_val, max_val - 1) + 1;
+    std::mt19937 eng(rd());
+    std::uniform_int_distribution<uint16_t> dist(1, 0xFFFE);
+    return mod(dist(eng), max_val - 1) + 1;
 }
 
-/* ================= ECC 연산 ================= */
-Point add(Point p, Point q){
-    if(p.inf) return q;
-    if(q.inf) return p;
-    if(p.x==q.x && mod(p.y+q.y,P)==0) return {0,0,true};
+static Point add_pt(Point p, Point q) {
+    if (p.inf) return q;
+    if (q.inf) return p;
+    if (p.x == q.x && mod(p.y + q.y, P) == 0) return {0, 0, true};
     cpp_int m;
-    if(p.x==q.x && p.y==q.y)
-        m = mod((3*p.x*p.x)*inv(2*p.y,P),P);
+    if (p.x == q.x && p.y == q.y)
+        m = mod((3 * p.x * p.x) * inv(2 * p.y, P), P);
     else
-        m = mod((q.y-p.y)*inv(q.x-p.x,P),P);
-    cpp_int rx = mod(m*m-p.x-q.x,P);
-    cpp_int ry = mod(m*(p.x-rx)-p.y,P);
-    return {rx,ry,false};
+        m = mod((q.y - p.y) * inv(q.x - p.x, P), P);
+    cpp_int rx = mod(m * m - p.x - q.x, P);
+    cpp_int ry = mod(m * (p.x - rx) - p.y, P);
+    return {rx, ry, false};
 }
 
-Point mul(Point p, cpp_int k){
-    Point r{0,0,true};
-    while(k>0){
-        if(k&1) r=add(r,p);
-        p=add(p,p);
-        k>>=1;
+static Point mul_pt(Point p, cpp_int k) {
+    Point r{0, 0, true};
+    while (k > 0) {
+        if (k & 1) r = add_pt(r, p);
+        p = add_pt(p, p);
+        k >>= 1;
     }
     return r;
 }
 
-/* ================= ECDSA ================= */
-std::pair<cpp_int,cpp_int> sign(const cpp_int& priv, const cpp_int& z){
-    cpp_int k = generateRandom256(N);
-    Point R = mul({Gx,Gy,false}, k);
-    cpp_int r = mod(R.x, N);
-    cpp_int s = mod(inv(k, N) * (z + r * priv), N);
+static std::pair<cpp_int, cpp_int> ecdsa_sign_16(const cpp_int& priv, const cpp_int& z) {
+    cpp_int k = generateRandom16(N_ecc);
+    Point R = mul_pt({Gx, Gy, false}, k);
+    cpp_int r = mod(R.x, N_ecc);
+    cpp_int s = mod(inv(k, N_ecc) * (z + r * priv), N_ecc);
     return {r, s};
 }
 
-bool verify(const Point& pub, const cpp_int& z, cpp_int r, cpp_int s){
-    cpp_int w = inv(s, N);
-    cpp_int u1 = mod(z * w, N), u2 = mod(r * w, N);
-    Point X = add(mul({Gx,Gy,false}, u1), mul(pub, u2));
-    return mod(X.x, N) == r;
+static bool ecdsa_verify_16(const Point& pub, const cpp_int& z, cpp_int r, cpp_int s) {
+    cpp_int w = inv(s, N_ecc);
+    cpp_int u1 = mod(z * w, N_ecc), u2 = mod(r * w, N_ecc);
+    Point X = add_pt(mul_pt({Gx, Gy, false}, u1), mul_pt(pub, u2));
+    return mod(X.x, N_ecc) == r;
 }
 
-/* ================= MAIN ================= */
 void run_ecc_encrypt() {
-    Point G{Gx,Gy,false};
-    std::string msg;
-    std::cout<<"Plaintext: ";
+    Point G{Gx, Gy, false};
+    std::string msg, priv_recv_str, priv_send_str;
+    std::cout << "Plaintext: ";
     std::getline(std::cin, msg);
 
-    // 1. 수신자(Receiver)의 키쌍 생성 (데모용)
-    cpp_int priv_recv = generateRandom256(N);
-    Point pub_recv = mul(G, priv_recv);
+    std::cout << "Enter Custom Receiver Private Key (HEX) [Enter to auto-generate]: ";
+    std::getline(std::cin, priv_recv_str);
+    std::cout << "Enter Custom Sender Private Key (HEX) [Enter to auto-generate]: ";
+    std::getline(std::cin, priv_send_str);
 
-    // 2. 송신자(Sender)의 키쌍 생성
-    cpp_int priv_send = generateRandom256(N);
-    Point pub_send = mul(G, priv_send);
+    auto total_start = std::chrono::steady_clock::now();
 
-    // 3. [공개키 암호화] 임시(Ephemeral) 키 생성 및 수신자 공개키로 공유 비밀(S) 계산
-    cpp_int k_eph = generateRandom256(N);
-    Point R_eph = mul(G, k_eph);             // 암호문과 함께 보낼 임시 공개키
-    Point S = mul(pub_recv, k_eph);          // S = k_eph * Pub_recv (수신자 공개키로 암호화)
+    // Step 1: Key Generation
+    auto s1_start = std::chrono::steady_clock::now();
+    cpp_int priv_recv = priv_recv_str.empty() ? generateRandom16(N_ecc) : cpp_int("0x" + priv_recv_str);
+    Point pub_recv = mul_pt(G, priv_recv);
 
-    // 4. KDF: SHA-256(S.x) → AES-128 Key 생성
-    std::vector<Byte> sx;
-    cpp_int tx = S.x;
-    for(int i=0; i<32; i++){ sx.insert(sx.begin(), (Byte)(tx&0xff)); tx>>=8; }
-    auto h = sha256(sx);
-    Block aesKey{};
-    for(int i=0; i<16; i++) aesKey[i] = h[i];
+    cpp_int priv_send = priv_send_str.empty() ? generateRandom16(N_ecc) : cpp_int("0x" + priv_send_str);
+    Point pub_send = mul_pt(G, priv_send);
+    auto s1_end = std::chrono::steady_clock::now();
 
-    // 5. 메시지 암호화
-    auto ct = aesCTR({msg.begin(), msg.end()}, aesKey);
+    // Step 2: ECDH Ephemeral Key Exchange & AES Encryption
+    auto s2_start = std::chrono::steady_clock::now();
+    cpp_int k_eph = generateRandom16(N_ecc);
+    Point R_eph = mul_pt(G, k_eph);
+    Point S = mul_pt(pub_recv, k_eph);
 
-    // 6. [전자서명] 송신자의 개인키로 암호문 해시 서명
-    auto hct = sha256(ct);
-    cpp_int z = 0; for(auto b:hct) z = (z<<8) | b;
-    auto sig = sign(priv_send, z);
+    std::vector<Byte> sx = {static_cast<Byte>((S.x >> 8) & 0xFF), static_cast<Byte>(S.x & 0xFF)};
+    auto h = CryptoSHA32::compute(sx);
+    uint16_t aesKey = (h[0] << 8) | h[1];
 
-    std::cout << "\n================ [출력 데이터] ================\n";
-    std::cout << "[Receiver Private Key (복호화 시 사용)]\n" << priv_recv << "\n\n";
-    std::cout << "[Ephemeral Public Key R_eph X, Y (복호화 시 필요)]\n" << R_eph.x << "\n" << R_eph.y << "\n\n";
-    std::cout << "[Sender Public Key X, Y (서명 검증 시 필요)]\n" << pub_send.x << "\n" << pub_send.y << "\n\n";
-    std::cout << "[Ciphertext HEX]\n";
-    for(auto b:ct) std::cout<<std::hex<<std::setw(2)<<std::setfill('0')<<(int)b;
-    std::cout<<std::dec<<"\n\n[Signature r, s]\n"<<sig.first<<"\n"<<sig.second<<"\n";
-    std::cout << "=================================================\n";
+    uint16_t block = msg.empty() ? 0x0000 : static_cast<uint16_t>(msg[0]);
+    uint16_t ct_block = CryptoAES16::encrypt(block, aesKey);
+    auto s2_end = std::chrono::steady_clock::now();
+
+    // Step 3: ECDSA Signature Generation
+    auto s3_start = std::chrono::steady_clock::now();
+    std::vector<Byte> ct_bytes = {static_cast<Byte>(ct_block >> 8), static_cast<Byte>(ct_block & 0xFF)};
+    auto hct = CryptoSHA32::compute(ct_bytes);
+    cpp_int z = CryptoSHA32::to_uint32(hct);
+
+    auto sig = ecdsa_sign_16(priv_send, z);
+    auto s3_end = std::chrono::steady_clock::now();
+
+    auto total_end = std::chrono::steady_clock::now();
+
+    std::chrono::duration<double, std::milli> s1_ms = s1_end - s1_start;
+    std::chrono::duration<double, std::milli> s2_ms = s2_end - s2_start;
+    std::chrono::duration<double, std::milli> s3_ms = s3_end - s3_start;
+    std::chrono::duration<double, std::milli> total_ms = total_end - total_start;
+
+    std::cout << "\n================ [ECC-16 / SHA-32 / AES-16 Output] ================\n";
+    std::cout << "[Receiver Private Key]\n0x" << std::hex << priv_recv << "\n\n";
+    std::cout << "[Ephemeral Public Key R_eph X, Y]\n0x" << R_eph.x << "\n0x" << R_eph.y << "\n\n";
+    std::cout << "[Sender Public Key X, Y]\n0x" << pub_send.x << "\n0x" << pub_send.y << "\n\n";
+    std::cout << "[AES-16 Ciphertext Block HEX]\n0x" << std::setw(4) << std::setfill('0') << ct_block << "\n\n";
+    std::cout << "[ECDSA Signature r, s]\n0x" << sig.first << "\n0x" << sig.second << "\n";
+    std::cout << "-------------------------------------------------------------------\n";
+    std::cout << "[Performance Metrics]\n";
+    std::cout << "Step 1 (Key Generation)  : " << s1_ms.count() << " ms\n";
+    std::cout << "Step 2 (ECDH & AES Enc)  : " << s2_ms.count() << " ms\n";
+    std::cout << "Step 3 (ECDSA Sign)      : " << s3_ms.count() << " ms\n";
+    std::cout << "Total Encryption Time    : " << total_ms.count() << " ms\n";
+    std::cout << "===================================================================\n" << std::dec;
 }
 
 void run_ecc_decrypt() {
-    Point G{Gx,Gy,false};
-    cpp_int priv_recv, re_x, re_y, ps_x, ps_y, r, s;
-    std::string hex;
+    Point G{Gx, Gy, false};
+    std::string priv_recv_str, re_x_str, re_y_str, ps_x_str, ps_y_str, ct_hex, r_str, s_str;
 
-    std::cout<<"Receiver Private Key: "; std::cin>>priv_recv;
-    std::cout<<"Ephemeral Public Key R_eph X Y:\n"; std::cin>>re_x>>re_y;
-    std::cout<<"Sender Public Key X Y:\n"; std::cin>>ps_x>>ps_y;
-    std::cin.ignore();
-    std::cout<<"Ciphertext HEX: "; std::getline(std::cin, hex);
-    std::cout<<"Signature r s:\n"; std::cin>>r>>s;
+    std::cout << "Receiver Private Key (HEX): "; std::cin >> priv_recv_str;
+    std::cout << "Ephemeral Public Key R_eph X Y (HEX):\n"; std::cin >> re_x_str >> re_y_str;
+    std::cout << "Sender Public Key X Y (HEX):\n"; std::cin >> ps_x_str >> ps_y_str;
+    std::cout << "Ciphertext Block (HEX): "; std::cin >> ct_hex;
+    std::cout << "Signature r s (HEX):\n"; std::cin >> r_str >> s_str;
 
-    std::vector<Byte> ct;
-    for(size_t i=0; i<hex.size(); i+=2)
-        ct.push_back(std::stoi(hex.substr(i,2), nullptr, 16));
+    auto total_start = std::chrono::steady_clock::now();
 
-    // 1. 송신자 서명 검증 (Sender Public Key 사용)
-    auto hct = sha256(ct);
-    cpp_int z = 0; for(auto b:hct) z = (z<<8) | b;
-    bool ok = verify({ps_x, ps_y, false}, z, r, s);
+    cpp_int priv_recv("0x" + priv_recv_str);
+    Point R_eph{cpp_int("0x" + re_x_str), cpp_int("0x" + re_y_str), false};
+    Point pub_send{cpp_int("0x" + ps_x_str), cpp_int("0x" + ps_y_str), false};
+    cpp_int r("0x" + r_str), s("0x" + s_str);
+    uint16_t ct_block = static_cast<uint16_t>(std::stoul(ct_hex, nullptr, 16));
 
-    // 2. [공개키 복호화] 수신자 개인키와 임시 공개키 R_eph 곱하여 공유 비밀(S) 복원
-    Point R_eph{re_x, re_y, false};
-    Point S = mul(R_eph, priv_recv);        // S = priv_recv * R_eph
+    // Step 1: ECDSA Signature Verification
+    auto s1_start = std::chrono::steady_clock::now();
+    std::vector<Byte> ct_bytes = {static_cast<Byte>(ct_block >> 8), static_cast<Byte>(ct_block & 0xFF)};
+    auto hct = CryptoSHA32::compute(ct_bytes);
+    cpp_int z = CryptoSHA32::to_uint32(hct);
 
-    // 3. KDF: SHA-256(S.x) → AES Key 복원
-    std::vector<Byte> sx;
-    cpp_int tx = S.x;
-    for(int i=0; i<32; i++){ sx.insert(sx.begin(), (Byte)(tx&0xff)); tx>>=8; }
-    auto h = sha256(sx);
-    Block aesKey{}; for(int i=0; i<16; i++) aesKey[i] = h[i];
+    bool ok = ecdsa_verify_16(pub_send, z, r, s);
+    auto s1_end = std::chrono::steady_clock::now();
 
-    // 4. 복호화 실행
-    auto pt = aesCTR(ct, aesKey);
+    // Step 2: ECDH Shared Secret & AES Decryption
+    auto s2_start = std::chrono::steady_clock::now();
+    Point S = mul_pt(R_eph, priv_recv);
+    std::vector<Byte> sx = {static_cast<Byte>((S.x >> 8) & 0xFF), static_cast<Byte>(S.x & 0xFF)};
+    auto h = CryptoSHA32::compute(sx);
+    uint16_t aesKey = (h[0] << 8) | h[1];
 
-    std::cout << "\n================ [검증 및 복호화 결과] ================\n";
+    uint16_t pt_block = CryptoAES16::decrypt(ct_block, aesKey);
+    auto s2_end = std::chrono::steady_clock::now();
+
+    auto total_end = std::chrono::steady_clock::now();
+
+    std::chrono::duration<double, std::milli> s1_ms = s1_end - s1_start;
+    std::chrono::duration<double, std::milli> s2_ms = s2_end - s2_start;
+    std::chrono::duration<double, std::milli> total_ms = total_end - total_start;
+
+    std::cout << "\n================ [Decryption and Verify Result] ================\n";
     if (ok) {
-        std::cout << "[+] Signature Status : VALID (송신자 서명 검증 성공)\n";
-        std::cout << "[+] Decrypted Plaintext : " << std::string(pt.begin(), pt.end()) << "\n";
+        std::cout << "[+] ECDSA Signature Status : VALID (Signature Verification Success)\n";
+        std::cout << "[+] Decrypted Plaintext     : " << static_cast<char>(pt_block & 0xFF) << "\n";
+    } else {
+        std::cout << "[-] ECDSA Signature Status : INVALID (Signature Verification Failed!)\n";
     }
-    else {
-        std::cout << "[-] Signature Status : INVALID (서명 검증 실패! 변조된 메시지입니다)\n";
-    }
-    std::cout << "========================================================\n";
+    std::cout << "-----------------------------------------------------------------\n";
+    std::cout << "[Performance Metrics]\n";
+    std::cout << "Step 1 (ECDSA Verify)    : " << s1_ms.count() << " ms\n";
+    std::cout << "Step 2 (ECDH & AES Dec)  : " << s2_ms.count() << " ms\n";
+    std::cout << "Total Decryption Time    : " << total_ms.count() << " ms\n";
+    std::cout << "=================================================================\n" << std::dec;
 }
-
-
-

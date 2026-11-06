@@ -13,5 +13,9 @@ add_executable(ECCAES main.cpp
         ECCVER.cpp
         ECCVER.hpp
         CryptoUtils.hpp
+        LWEVER.cpp
+        LWEVER.hpp
+        LWEVER.cpp
 
 )
+

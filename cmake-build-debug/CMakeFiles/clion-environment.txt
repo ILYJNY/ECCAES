@@ -1,4 +1,4 @@
-ToolSet: 11.0 w64 (local)@C:\Users\komaL\AppData\Local\Programs\CLion\bin\mingw
+ToolSet: 18.0 (local)@C:\Program Files\Microsoft Visual Studio\18\Community
 Ninja: 1.13.2@C:\Users\komaL\AppData\Local\Programs\CLion\bin\ninja\win\x64\ninja.exe
 Options: 
 

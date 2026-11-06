@@ -1,6 +1,7 @@
 #include <iostream>
 #include "ECCVER.hpp"
 #include "RSAVER.hpp"
+#include "LWEVER.hpp"
 
 int main() {
     std::cout << "======================================\n";
@@ -11,11 +12,17 @@ int main() {
         std::cout << "\n[ Algorithm Selection ]\n";
         std::cout << "1. ECC (ECDH Key Exchange + ECDSA Signature)\n";
         std::cout << "2. RSA (RSA-KEM + RSA-PSS Signature)\n";
+        std::cout << "3. Post-Quantum Suite (KeyGen + LWE + SHA-32 + ML-DSA + AES-16)\n";
         std::cout << "0. Exit\n";
         std::cout << "Select > ";
 
         int algo;
         if (!(std::cin >> algo) || algo == 0) break;
+
+        if (algo == 3) {
+            LWEVER();
+            continue;
+        }
 
         std::cout << "\n[ Operation Selection ]\n";
         std::cout << "1. Encrypt and Sign (Tx)\n";
@@ -24,16 +31,24 @@ int main() {
 
         int op;
         std::cin >> op;
-        std::cin.ignore(); // 버퍼 비우기
+        std::cin.ignore();
 
         if (algo == 1) {
-            if (op == 1) run_ecc_encrypt();
-            else if (op == 2) run_ecc_decrypt();
+            if (op == 1) {
+                run_ecc_encrypt();
+            }
+            else if (op == 2) {
+                run_ecc_decrypt();
+            }
             else std::cout << "Invalid operation.\n";
         }
         else if (algo == 2) {
-            if (op == 1) run_rsa_encrypt();
-            else if (op == 2) run_rsa_decrypt();
+            if (op == 1) {
+                run_rsa_encrypt();
+            }
+            else if (op == 2) {
+                run_rsa_decrypt();
+            }
             else std::cout << "Invalid operation.\n";
         }
         else {
